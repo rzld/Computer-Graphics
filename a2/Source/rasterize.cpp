@@ -40,6 +40,7 @@ struct Pixel
 	int x;
 	int y;
 	float zinv;
+	//vec3 illumination;
 };
 struct Vertex
 {
@@ -132,6 +133,8 @@ void Draw()
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
+
+		currentColor = vec3(triangles.color);
 
 		// dots only
 		for (int v=0; v<3; ++v)
@@ -286,11 +289,14 @@ void ComputePolygonRows(const vector<glm::ivec2>& vertexPixels,
 
 void DrawPolygonRows(const vector<glm::ivec2>& leftPixels, const vector<glm::ivec2>& rightPixels)
 {
-	vector<glm::ivec2> rowPixels((rightPixels.x - leftPixels.x)+1);
-	Interpolate(leftPixels, rightPixels, rowPixels);
-	for (int i=0; i<rowPixels.size(); i++)
+	for (int i=0; i<leftPixels.size(); i++)
 	{
-		PutPixelSDL(screen, rowPixels[i].x, rowPixels[i].y, currentColor);
+		vector<glm::ivec2> rowPixels((rightPixels.x - leftPixels.x)+1);
+		Interpolate(leftPixels, rightPixels, rowPixels);
+		for (int i=0; i<rowPixels.size(); i++)
+		{
+			PutPixelSDL(screen, rowPixels[i].x, rowPixels[i].y, currentColor);
+		}
 	}
 	/*
 	for (int i=0; i<leftPixels.size(); i++)
@@ -309,7 +315,7 @@ void DrawPolygonRows(const vector<glm::ivec2>& leftPixels, const vector<glm::ive
 void DrawPolygon(const vector<vec3>& vertices)
 {
 	int V = vertices.size();
-	currentColor = vec3(vertices.color);
+	//currentColor = vec3(vertices.color);
 
 	vector<glm::ivec2> vertexPixels(V);
 	for (int i=0; i<V; i++)
@@ -326,13 +332,25 @@ void DrawPolygon(const vector<vec3>& vertices)
 void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 {
 	int N = result.size();
-	vec3 step = vec3(b-a) / float(max(N-1,1));
-	vec3 current(a);
+	//Pixel step = Pixel(b-a) / float(glm::max(N-1, 1));
+	//Pixel current(a);
+
+	float stepX = (b.x - a.x) / float(glm::max(N-1, 1));
+	float stepY = (b.y - a.y) / float(glm::max(N-1, 1));
+	float stepZ = (b.zinv - a.zinv) / float(glm::max(N-1, 1));
 
 	for (int i=0; i<N; ++i)
 	{
-		result[i] = current;
-		current += step;
+		//result[i] = current;
+		//current += step;
+
+		result[i].x = a.x;
+		result[i].y = a.y;
+		result[i].zinv = a.zinv;
+
+		a.x += stepX;
+		a.y += stepY;
+		a.zinv += stepZ;
 	}
 }
 
@@ -342,10 +360,10 @@ void VertexShaderP(const vec3& v, Pixel p)
 	vec3 pos = (v - cameraPos) * R;
 
 	p.zinv = 1/pos.z;
-	p.x = (focalLength * ( pos.x /  pos.z )) + (SCREEN_WIDTH / 2);
-	p.y = (focalLength * ( pos.y /  pos.z )) + (SCREEN_HEIGHT / 2);
-	
-	depthBuffer[p.y][p.x] = p.zinv;
+	p.x = (focalLength * pos.x * p.zinv) + (SCREEN_WIDTH / 2);
+	p.y = (focalLength * pos.y * p.zinv) + (SCREEN_HEIGHT / 2);
+
+	//depthBuffer[p.y][p.x] = p.zinv;
 }
 
 void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
@@ -384,7 +402,7 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 	//    and leftPixels
 	for (int i=0; i<vertexPixels.size(); i++)
 	{
-		int j = (i+1)%V; //next vertex
+		int j = (i+1) % vertexPixels.size(); //next vertex
 		Pixel delta = glm::abs(vertexPixels[i]-vertexPixels[j]);
 		int pixels = glm::max(delta.x, delta.y) + 1;
 
@@ -414,11 +432,15 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 
 void DrawPolygonRowsP(const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels)
 {
-	vector<Pixel> rowPixels((rightPixels.x - leftPixels.x)+1);
-	Interpolate(leftPixels, rightPixels, rowPixels);
-	for (int i=0; i<rowPixels.size(); i++)
+	for (int i=0; i<leftPixels.size(); i++)
 	{
-		PutPixelSDL(screen, rowPixels[i].x, rowPixels[i].y, currentColor);
+		vector<Pixel> rowPixels((rightPixels.x - leftPixels.x)+1);
+		Interpolate(leftPixels, rightPixels, rowPixels);
+		for (int i=0; i<rowPixels.size(); i++)
+		{
+			//in zinv > depthbuffer?, update depthbuffer too
+			PutPixelSDL(screen, rowPixels[i].x, rowPixels[i].y, currentColor);
+		}
 	}
 	/*
 	for (int i=0; i<leftPixels.size(); i++)
