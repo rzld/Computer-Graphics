@@ -1,7 +1,8 @@
 //RASTERISATION
 
 //Progress 27/03/2017:
-// vertexshaderP bener
+// InterpolateP:
+// kalo step -0.xxxx, jadi ditambah 1
 
 #include <iostream>
 #include <glm/glm.hpp>
@@ -25,7 +26,7 @@ SDL_Surface* screen;
 int t;
 
 vector<Triangle> triangles;
-vec3 cameraPos(0, 0, -3.001);
+vec3 cameraPos(0, 0, -2.0);
 float focalLength = 250.0;
 mat3 R;
 float yaw = 0;
@@ -129,7 +130,7 @@ void Draw()
 		for (int x=0; x<SCREEN_WIDTH; ++x)
 			depthBuffer[y][x] = 0;
 
-	for (int i=0; i<triangles.size(); ++i)
+	for (int i=0; i<(int)triangles.size(); ++i)
 	{
 		//cout << i << "/" << triangles.size() << endl;
 		vector<vec3> vertices(3);
@@ -151,7 +152,7 @@ void Draw()
 		}
 
 		//DrawPolygonEdgesP(vertices);
-		DrawPolygon(vertices);
+		DrawPolygonP(vertices);
 	}
 
 	//original
@@ -200,7 +201,7 @@ void DrawLineSDL(SDL_Surface* surface, glm::ivec2 a, glm::ivec2 b, vec3 color)
 	vector<glm::ivec2> line(pixels);
 	Interpolate(a, b, line);
 
-	for (int i=0; i<line.size(); i++)
+	for (int i=0; i<(int)line.size(); i++)
 	{
 		PutPixelSDL(surface, line[i].x, line[i].y, color);
 	}
@@ -238,7 +239,7 @@ void ComputePolygonRows(const vector<glm::ivec2>& vertexPixels,
 
 	// 1. Find max & min y-value of the polygon and compute the number of rows it occupies
 	//cout << "Step 1" << endl;
-	for (int i=0; i<vertexPixels.size(); i++)
+	for (int i=0; i<(int)vertexPixels.size(); i++)
 	{
 		minY = glm::min(minY, vertexPixels[i].y);
 		maxY = glm::max(maxY, vertexPixels[i].y);
@@ -267,7 +268,7 @@ void ComputePolygonRows(const vector<glm::ivec2>& vertexPixels,
 	//    the x-coordinate for each row it occupies. Update the corresponding values in rightPixels
 	//    and leftPixels
 	//cout << "Step 4" << endl;
-	for (int i=0; i<vertexPixels.size(); i++)
+	for (int i=0; i<(int)vertexPixels.size(); i++)
 	{
 		int j = (i+1)%vertexPixels.size(); //next vertex
 		glm::ivec2 delta = glm::abs(vertexPixels[i]-vertexPixels[j]);
@@ -277,7 +278,7 @@ void ComputePolygonRows(const vector<glm::ivec2>& vertexPixels,
 		Interpolate(vertexPixels[i], vertexPixels[j], line);
 
 		// check for every point in line
-		for (int a=0; a<line.size(); a++)
+		for (int a=0; a<(int)line.size(); a++)
 		{
 			//cout << line[i].x << " " << line[i].y << endl;
 			// check for every point in left & right pixels
@@ -299,11 +300,11 @@ void ComputePolygonRows(const vector<glm::ivec2>& vertexPixels,
 
 void DrawPolygonRows(const vector<glm::ivec2>& leftPixels, const vector<glm::ivec2>& rightPixels)
 {
-	for (int i=0; i<leftPixels.size(); i++)
+	for (int i=0; i<(int)leftPixels.size(); i++)
 	{
 		vector<glm::ivec2> rowPixels((rightPixels[i].x - leftPixels[i].x)+1);
 		Interpolate(leftPixels[i], rightPixels[i], rowPixels);
-		for (int i=0; i<rowPixels.size(); i++)
+		for (int i=0; i<(int)rowPixels.size(); i++)
 		{
 			PutPixelSDL(screen, rowPixels[i].x, rowPixels[i].y, currentColor);
 		}
@@ -337,7 +338,7 @@ void DrawPolygon(const vector<vec3>& vertices)
 	vector<glm::ivec2> rightPixels;
 	//cout << "Computing polygon rows" << endl;
 	ComputePolygonRows(vertexPixels, leftPixels, rightPixels);
-	for (int row=0; row<leftPixels.size(); ++row)
+	for (int row=0; row<(int)leftPixels.size(); ++row)
 	{
 		cout << "Start: ("
 		     << leftPixels[row].x << ","
@@ -389,19 +390,28 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 	float stepX = (b.x - a.x) / float(glm::max(N-1, 1));
 	float stepY = (b.y - a.y) / float(glm::max(N-1, 1));
 	float stepZ = (b.zinv - a.zinv) / float(glm::max(N-1, 1));
+	//cout << "Step X " << stepX << endl;
+	//cout << "Step Y " << stepY << endl;
+	//cout << "Step Z " << stepZ << endl;
 
-	for (int i=0; i<N; ++i)
+	float currentX = (float)a.x;
+	float currentY = (float)a.y;
+	float currentZ = a.zinv;
+
+	for (int i=0; i<N; i++)
 	{
 		//result[i] = current;
 		//current += step;
 
-		result[i].x = a.x;
-		result[i].y = a.y;
-		result[i].zinv = a.zinv;
+		result[i].x = (int)currentX;
+		result[i].y = (int)currentY;
+		result[i].zinv = current.zinv;
 
-		a.x += stepX;
-		a.y += stepY;
-		a.zinv += stepZ;
+		currentX += stepX;
+		currentY += stepY;
+		currentZ += stepZ;
+		cout << stepX << " " << stepY << endl;
+		cout << "current " << currentX << " " << currentY << endl;
 	}
 }
 
@@ -426,7 +436,7 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 	int rows;
 
 	// 1. Find max & min y-value of the polygon and compute the number of rows it occupies
-	for (int i=0; i<vertexPixels.size(); i++)
+	for (int i=0; i<(int)vertexPixels.size(); i++)
 	{
 		minY = glm::min(minY, vertexPixels[i].y);
 		maxY = glm::max(maxY, vertexPixels[i].y);
@@ -451,7 +461,7 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 	// 4. Loop through all edges of the polygon and use linear interpolation to find
 	//    the x-coordinate for each row it occupies. Update the corresponding values in rightPixels
 	//    and leftPixels
-	for (int i=0; i<vertexPixels.size(); i++)
+	for (int i=0; i<(int)vertexPixels.size(); i++)
 	{
 		int j = (i+1) % vertexPixels.size(); //next vertex
 		//Pixel delta = glm::abs(vertexPixels[i]-vertexPixels[j]);
@@ -464,11 +474,19 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 		//cout << j << endl;
 		//cout << vertexPixels[j].x << " " << vertexPixels[j].y << " " << vertexPixels[j].zinv << endl;
 
-		vector<Pixel> line(pixels);
+		vector<Pixel> line;
+		line.resize(pixels);
 		InterpolateP(vertexPixels[i], vertexPixels[j], line);
+		cout << "Start " << vertexPixels[i].x << " " << vertexPixels[i].y << endl;
+		//for (int p=0; p<line.size(); p++)
+		//{
+			//cout << line[p].x << " " << line[p].y << " " << line[p].zinv << endl;
+		//}
+		cout << "End " << vertexPixels[j].x << " " << vertexPixels[j].y << endl;
+		cout << endl;
 
 		// check for every point in line
-		for (int a=0; a<line.size(); a++)
+		for (int a=0; a<(int)line.size(); a++)
 		{
 			//cout << line[a].x << " " << line[a].y << " " << line[a].zinv << endl;
 			// check for every point in left & right pixels
@@ -484,12 +502,12 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 					leftPixels[b].x = leftX;
 					rightPixels[b].x = rightX;
 
-					if (line[a].x > leftPixels[b].x)
+					if (line[a].x < leftPixels[b].x)
 					{
 						leftPixels[b].zinv = line[a].zinv;
 						//depthBuffer[leftPixels[b].y][leftPixels[b].x] = leftPixels[b].zinv;
 					}
-					if (line[a].x < rightPixels[b].x)
+					if (line[a].x > rightPixels[b].x)
 					{
 						rightPixels[b].zinv = line[a].zinv;
 						//depthBuffer[rightPixels[b].y][rightPixels[b].x] = rightPixels[b].zinv;
@@ -497,18 +515,18 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 				}
 			}
 		}
-		cout << endl;
+		//cout << endl;
 	}
 }
 
 void DrawPolygonRowsP(const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels)
 {
-	for (int i=0; i<leftPixels.size(); i++)
+	for (int i=0; i<(int)leftPixels.size(); i++)
 	{
 		vector<Pixel> rowPixels((rightPixels[i].x - leftPixels[i].x)+1);
 		InterpolateP(leftPixels[i], rightPixels[i], rowPixels);
 
-		for (int j=0; j<rowPixels.size(); j++)
+		for (int j=0; j<(int)rowPixels.size(); j++)
 		{
 			//cout << rowPixels[j].zinv << " " << depthBuffer[rowPixels[j].y][rowPixels[j].x] << endl;
 			//in zinv > depthbuffer?, update depthbuffer too
