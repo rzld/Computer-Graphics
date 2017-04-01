@@ -1,8 +1,8 @@
 //RASTERISATION
 
-//Progress 27/03/2017:
-// InterpolateP:
-// kalo step -0.xxxx, jadi ditambah 1
+//Progress 01/04/2017:
+//edited VertexShaderP, InterpolateP & PixelShader
+//  to compute illumination
 
 #include <iostream>
 #include <glm/glm.hpp>
@@ -11,6 +11,8 @@
 #include "SDLauxiliary.h"
 #include "TestModel.h"
 #include <limits>
+
+#define PI 3.14159
 
 using namespace std;
 using glm::vec3;
@@ -35,6 +37,8 @@ vec3 currentColor;
 vec3 lightPos(0, -0.5, -0.7);
 vec3 lightPower = 1.1f*vec3(1,1,1);
 vec3 indirectLight = 0.5f*vec3(1,1,1);
+vec3 currentNormal;
+vec3 currentReflectance;
 
 struct Pixel
 {
@@ -42,7 +46,9 @@ struct Pixel
 	int y;
 	float zinv;
 	vec3 illumination;
+	//vec3 pos3d;
 };
+
 struct Vertex
 {
 	vec3 position;
@@ -81,26 +87,6 @@ int main( int argc, char* argv[] )
 
 	LoadTestModel(triangles);
 	cout << "Load test model" << endl;
-
-	// ComputePolygonRows test
-	/*
-	vector<glm::ivec2> vertexPixels(3);
-	vertexPixels[0] = glm::ivec2(10, 5);
-	vertexPixels[1] = glm::ivec2(5, 10);
-	vertexPixels[2] = glm::ivec2(15, 15);
-	vector<glm::ivec2> leftPixels;
-	vector<glm::ivec2> rightPixels;
-	ComputePolygonRows(vertexPixels, leftPixels, rightPixels);
-	for (int row=0; row<leftPixels.size(); ++row)
-	{
-		cout << "Start: ("
-		     << leftPixels[row].x << ","
-		     << leftPixels[row].y << "). "
-		     << "End: ("
-		     << rightPixels[row].x << ","
-		     << rightPixels[row].y << "). " << endl;
-	}
-	*/
 
 	while( NoQuitMessageSDL() )
 	{
@@ -144,6 +130,14 @@ void Draw()
 		vertices[0].position = triangles[i].v0;
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
+
+		vertices[0].normal = triangles[i].normal;
+		vertices[1].normal = triangles[i].normal;
+		vertices[2].normal = triangles[i].normal;
+
+		vertices[0].reflectance = triangles[i].color;
+		vertices[1].reflectance = triangles[i].color;
+		vertices[2].reflectance = triangles[i].color;
 
 		currentColor = vec3(triangles[i].color);
 
@@ -352,8 +346,30 @@ void VertexShaderP(const Vertex& v, Pixel& p)
 	p.zinv = 1/pos.z;
 	p.x = (focalLength * (pos.x / pos.z)) + (SCREEN_WIDTH / 2);
 	p.y = (focalLength * (pos.y / pos.z)) + (SCREEN_HEIGHT / 2);
-	//cout << p.x << " " << p.y << " " << p.zinv << endl;
-	//depthBuffer[p.y][p.x] = p.zinv;
+
+	//light
+	float radius;
+	float area;
+	vec3 _n, _r, d;
+
+	radius = glm::distance(lightPos, v.position);
+	area = 4 * PI * radius * radius;
+
+	_n = v.normal;
+	_r = glm::normalize(lightPos - v.position);
+
+	float pMax = glm::max((float)glm::dot(_r, _n), 0.0);
+
+	if (pMax > 0.0)
+	{
+		d = lightColor/area;
+	}
+	else
+	{
+		d = vec3(0.0, 0.0, 0.0);
+	}
+
+	p.illumination = v.reflectance * (d + indirectLight);
 }
 
 //void DrawPolygonP(const vector<vec3>& vertices)
@@ -364,7 +380,7 @@ void DrawPolygonP(const vector<Vertex>& vertices)
 	vector<Pixel> vertexPixels(V);
 	for (int i=0; i<V; i++)
 	{
-		VertexShaderP(vertices[i].position, vertexPixels[i]);
+		VertexShaderP(vertices[i], vertexPixels[i]);
 	}
 
 	vector<Pixel> leftPixels;
@@ -380,20 +396,24 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 	float stepX = (b.x - a.x) / float(glm::max(N-1, 1));
 	float stepY = (b.y - a.y) / float(glm::max(N-1, 1));
 	float stepZ = (b.zinv - a.zinv) / float(glm::max(N-1, 1));
+	vec3 stepI = (b.illumination - a.illumination) / float(glm::max(N-1, 1));
 
 	float currentX = (float)a.x;
 	float currentY = (float)a.y;
 	float currentZ = a.zinv;
+	vec3 currentI(a.illumination);
 
 	for (int i=0; i<N; i++)
 	{
 		result[i].x = (int)currentX;
 		result[i].y = (int)currentY;
 		result[i].zinv = currentZ;
+		result[i].illumination = currentI;
 
 		currentX += stepX;
 		currentY += stepY;
 		currentZ += stepZ;
+		currentI += stepI;
 	}
 }
 
@@ -519,6 +539,6 @@ void PixelShader(const Pixel& p)
 	if(p.zinv > depthBuffer[p.y][p.x])
 	{
 		depthBuffer[p.y][p.x] = p.zinv;
-		PutPixelSDL(screen, p.x, p.y, currentColor);
+		PutPixelSDL(screen, p.x, p.y, p.illumination);
 	}
 }
