@@ -1,3 +1,6 @@
+// 11.04.17
+// direct shadow still not working
+
 // 20.03.17
 // code finished, but there are still bugs:
 // - some triangle lines still appear
@@ -344,12 +347,10 @@ vec3 DirectLight(const Intersection& i)
 	/* check for another surface */
 	/*
 	bool check = ClosestIntersection(intersectionPos, lightPos, triangles, otherSurface);
-	if (check)
+	if (check && glm::distance(lightPos, otherSurface.position) < radius)
 	{
-		if (glm::distance(otherSurface.position, intersectionPos) < radius)
-		{
-			d = vec3(0.0, 0.0, 0.0);
-		}
+		//cout << "Shadow!" << endl;
+		d = vec3(0.0, 0.0, 0.0);
 	}
 	*/
 
