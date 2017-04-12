@@ -1,10 +1,6 @@
-// 11.04.17
-// direct shadow still not working
+//12.04.17 - direct shadow works!
 
-// 20.03.17
-// code finished, but there are still bugs:
-// - some triangle lines still appear
-// - try using antialiasing to fix it and extension
+//this file is for raytracer with extension
 
 #include <iostream>
 #include <glm/glm.hpp>
@@ -14,6 +10,7 @@
 #include "TestModel.h"
 #include "limits.h"
 #include "math.h"
+//#include <random>
 
 #define PI 3.14159
 
@@ -56,6 +53,11 @@ vec3 indirectLight = 0.5f * vec3(1, 1, 1);
 vec3 forward(0.0, 0.0, 0.1); //for backward, subtract this vector
 vec3 _right(0.1, 0.0, 0.0); //for left, subtract this vector
 vec3 up(0.0, -0.1, 0.0); //for down, subtract this vector
+
+//DOF
+int apertureSize = 64;
+int rays = 16;
+float focalDistance = 10;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -200,46 +202,76 @@ void Draw()
 		SDL_LockSurface(screen);
 
 	//cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << " " << endl;
-
+	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, 0.0));
 	for( int j=0; j<SCREEN_HEIGHT; ++j )
 	{
 		for( int i=0; i<SCREEN_WIDTH; ++i )
 		{
+			vector<vec3> newCameraPos(rays);
+			vec3 totalColor;
+
 			vec3 dir((float)i - (float)(SCREEN_WIDTH/2.0),
 			       (float)j - (float)(SCREEN_HEIGHT/2.0),
                                (float)focalLength);
 
+			vec3 focalPoint = cameraPos + (focalDistance/(eyeDist/(eyeDist+focalLength))) * (dir-cameraPos);
 
-			dir = glm::normalize(dir);
+			int randomX[rays], randomY[rays], _x, _y;
+			//std::default_random_engine generator;
+  		//std::uniform_int_distribution<int> distribution(0,apertureSize);
 
-			bool check;
-			check = ClosestIntersection(cameraPos, dir, triangles, closestInt);
-
-			if (check)
+			for (int n=0; n<rays; n++)
 			{
-				intersectionIndex = closestInt.triangleIndex;
-				//triangle color
-				vec3 color(triangles[intersectionIndex].color);
-				//PutPixelSDL( screen, i, j, color );
+				//_x = distribution(generator);
+				//_y = distribution(generator);
+				_x = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
+				_y = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
+				randomX[n] = _x;
+				randomY[n] = _y;
 
-				//light only
-				vec3 color2(DirectLight(closestInt));
-				//PutPixelSDL( screen, i, j, color2 );
-
-				//color * light
-				vec3 color3(color * color2);
-				//PutPixelSDL( screen, i, j, color3 );
-
-				//indirect illumination
-				vec3 _R = color * (color2 + indirectLight);
-				PutPixelSDL(screen, i, j, _R);
+				newCameraPos[n] = vec3((float)randomX[n], (float)randomY[n], -1.9);
 			}
-			else
+
+			dir = glm::normalize(focalPoint);
+
+			vec3 color;
+
+			for (int n=0; n<rays; n++)
 			{
-				//black
-				vec3 color( 0.0, 0.0, 0.0 );
-				PutPixelSDL( screen, i, j, color );
+				bool check;
+				check = ClosestIntersection(newCameraPos[n], dir, triangles, closestInt);
+
+				if (check)
+				{
+					//cout << "Check" << endl;
+					intersectionIndex = closestInt.triangleIndex;
+					//triangle color
+					vec3 colorOri(triangles[intersectionIndex].color);
+					//PutPixelSDL( screen, i, j, color );
+
+					//light only
+					vec3 lightVec(DirectLight(closestInt));
+					//PutPixelSDL( screen, i, j, color2 );
+
+					//color * light
+					//vec3 colorLight(colorOri * lightVec);
+					//PutPixelSDL( screen, i, j, color3 );
+
+					//indirect illumination
+					color = colorOri * (lightVec + indirectLight);
+					//PutPixelSDL(screen, i, j, _R);
+				}
+				else
+				{
+					//black
+					color = vec3( 0.0, 0.0, 0.0 );
+					//PutPixelSDL( screen, i, j, color );
+				}
+
+				totalColor += color;
 			}
+			//cout << totalColor.x << " " << totalColor.y << " " << totalColor.z << endl;
+			PutPixelSDL(screen, i, j, totalColor);
 		}
 	}
 
@@ -309,31 +341,14 @@ vec3 DirectLight(const Intersection& i)
 	Intersection otherSurface;
 
 	_n = triangles[i.triangleIndex].normal;
-	//cout << _normal.x << " " << _normal.y << " " << _normal.z << endl;
-
-	//rx = lightPos.x - intersectionPos.x;
-	//ry = lightPos.y - intersectionPos.y;
-	//rz = lightPos.z - intersectionPos.z;
-	//cout << rx << " " << ry << " " << rz << endl;
-	//cout << intersectionPos.x << " " << intersectionPos.y << " " << intersectionPos.z << endl;
-
-	//radius = sqrt(pow(rx, 2) + pow(ry, 2) + pow(rz, 2));
 
 	radius = glm::distance(lightPos, intersectionPos);
 	area = 4 * PI * radius * radius;
-	//cout << radius << " " << area << endl;
 
-	//vec3 dr = lightPos - intersectionPos;
-	//dr = glm::normalize(dr);
-	//_n = glm::normalize(_n);
 	_r = lightPos - intersectionPos;
 	_r = glm::normalize(_r);
-	//cout << _r.x << " " << _r.y << " " << _r.z << endl;
 
 	float pMax = glm::max((float)glm::dot(_r, _n), (float)0.0);
-	//cout << pMax << endl;
-
-	//d = lightColor/area;
 
 	if (pMax > 0.0)
 	{
@@ -343,8 +358,6 @@ vec3 DirectLight(const Intersection& i)
 	{
 		d = vec3(0.0, 0.0, 0.0);
 	}
-
-	//cout << d.x << " " << d.y << " " << d.z << endl;
 
 	/* check for another surface */
 
