@@ -38,22 +38,18 @@ vec3 lightPower = 1.1f*vec3(1,1,1);
 vec3 indirectLight = 0.5f*vec3(1,1,1);
 vec3 surfacePoint;
 
-vec3 currentNormal;
-vec3 currentReflectance;
-
 struct Pixel
 {
 	int x;
 	int y;
 	float zinv;
-	vec3 pos3d;
-	//vec3 illumination;
+	vec3 illumination;
 };
 struct Vertex
 {
 	vec3 position;
-	//vec3 normal;
-	//vec3 reflectance;
+	vec3 normal;
+	vec3 reflectance;
 };
 
 /* ----------------------------------------------------------------------------*/
@@ -152,23 +148,20 @@ void Draw()
 		vertices[1].position = vec3(triangles[i].v1);
 		vertices[2].position = vec3(triangles[i].v2);
 
-		/*vertices[0].normal = vec3(triangles[i].normal);
+		vertices[0].normal = vec3(triangles[i].normal);
 		vertices[1].normal = vec3(triangles[i].normal);
 		vertices[2].normal = vec3(triangles[i].normal);
 
 		vertices[0].reflectance = vec3(triangles[i].color);
 		vertices[1].reflectance = vec3(triangles[i].color);
-		vertices[2].reflectance = vec3(triangles[i].color);*/
-
-		currentNormal = vec3(triangles[i].normal);
-		currentReflectance = vec3(triangles[i].color);
+		vertices[2].reflectance = vec3(triangles[i].color);
 
 		surfacePoint = vec3(triangles[i].v0);
 
-		//currentColor = vec3(triangles[i].color);
+		currentColor = vec3(triangles[i].color);
 
 		// dots only
-		/*for (int v=0; v<3; ++v)
+		for (int v=0; v<3; ++v)
 		{
 			glm::ivec2 projPos;
 			//VertexShader(vertices[v], projPos);
@@ -176,7 +169,7 @@ void Draw()
 			//cout << projPos.x << " " << projPos.y << endl;
 			//vec3 color(1.0, 1.0, 1.0);
 			//PutPixelSDL(screen, projPos.x, projPos.y, color);
-		}*/
+		}
 
 		//DrawPolygonEdgesP(vertices);
 		DrawPolygonP(vertices);
@@ -372,12 +365,9 @@ void VertexShaderP(const Vertex& v, Pixel& p)
 	p.zinv = 1/pos.z;
 	p.x = (focalLength * (pos.x / pos.z)) + (SCREEN_WIDTH / 2);
 	p.y = (focalLength * (pos.y / pos.z)) + (SCREEN_HEIGHT / 2);
-	p.pos3d = vec3(pos); //or vec3(v.position)?
-
 	//cout << p.x << " " << p.y << " " << p.zinv << endl;
 	//depthBuffer[p.y][p.x] = p.zinv;
 
-	/*
 	//light
 	float radius;
 	float area;
@@ -408,7 +398,6 @@ void VertexShaderP(const Vertex& v, Pixel& p)
 	p.illumination = v.reflectance * (d + indirectLight);
 
 	//cout << p.illumination.x << " " << p.illumination.y << " " << p.illumination.z << endl;
-	*/
 }
 
 //void DrawPolygonP(const vector<vec3>& vertices)
@@ -435,8 +424,7 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 	float stepX = (b.x - a.x) / float(glm::max(N-1, 1));
 	float stepY = (b.y - a.y) / float(glm::max(N-1, 1));
 	float stepZ = (b.zinv - a.zinv) / float(glm::max(N-1, 1));
-	//vec3 stepI = (b.illumination - a.illumination) / float(glm::max(N-1, 1));
-	vec3 stepP = (b.pos3d - a.pos3d) / float(glm::max(N - 1, 1));
+	vec3 stepI = (b.illumination - a.illumination) / float(glm::max(N-1, 1));
 
 	//cout << a.illumination.x << " " << a.illumination.y << " " << a.illumination.z << endl;
 	//cout << b.illumination.x << " " << b.illumination.y << " " << b.illumination.z << endl << endl;
@@ -445,22 +433,19 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 	float currentX = (float)a.x;
 	float currentY = (float)a.y;
 	float currentZ = a.zinv;
-	//vec3 currentI = a.illumination;
-	vec3 currentP = a.pos3d;
+	vec3 currentI = a.illumination;
 
 	for (int i=0; i<N; i++)
 	{
 		result[i].x = (int)currentX;
 		result[i].y = (int)currentY;
 		result[i].zinv = currentZ;
-		//result[i].illumination = currentI;
-		result[i].pos3d = currentP;
+		result[i].illumination = currentI;
 
 		currentX += stepX;
 		currentY += stepY;
 		currentZ += stepZ;
-		//currentI += stepI;
-		currentP += stepP;
+		currentI += stepI;
 	}
 }
 
@@ -587,41 +572,11 @@ void DrawPolygonEdgesP(const vector<Vertex>& vertices)
 
 void PixelShader(const Pixel& p)
 {
-	//light
-	float radius;
-	float area;
-	vec3 _n, _r, d, illumination;
-
-	_n = v.normal;
-	radius = glm::distance(lightPos, surfacePoint);
-	area = 4 * PI * radius * radius;
-
-	//cout << radius << " " << area << endl;
-
-	_r = glm::normalize(lightPos - surfacePoint);
-
-	float pMax = glm::max((float)glm::dot(_r, _n), (float)0.0);
-
-	//cout << pMax << endl;
-
-	if (pMax > 0.0)
-	{
-		d = lightPower/area;
-	}
-	else
-	{
-		d = vec3(0.0, 0.0, 0.0);
-	}
-
-	//d = lightPower/area;
-	illumination = currentReflectance * (d + indirectLight);
-
 	//cout << p.illumination.x << " " << p.illumination.y << " " << p.illumination.z << endl;
-	
 
 	if(p.zinv > depthBuffer[p.y][p.x])
 	{
 		depthBuffer[p.y][p.x] = p.zinv;
-		PutPixelSDL(screen, p.x, p.y, illumination);
+		PutPixelSDL(screen, p.x, p.y, p.illumination);
 	}
 }
