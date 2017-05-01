@@ -57,7 +57,7 @@ vec3 up(0.0, -0.1, 0.0); //for down, subtract this vector
 //DOF
 int apertureSize = 64;
 int rays = 16;
-float focalDistance = 10;
+float focalDistance = 100;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -202,7 +202,7 @@ void Draw()
 		SDL_LockSurface(screen);
 
 	//cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << " " << endl;
-	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, 0.0));
+	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, float(focalLength));
 	for( int j=0; j<SCREEN_HEIGHT; ++j )
 	{
 		for( int i=0; i<SCREEN_WIDTH; ++i )
@@ -211,14 +211,16 @@ void Draw()
 			vec3 totalColor;
 
 			vec3 dir((float)i - (float)(SCREEN_WIDTH/2.0),
-			       (float)j - (float)(SCREEN_HEIGHT/2.0),
-                               (float)focalLength);
+			         (float)j - (float)(SCREEN_HEIGHT/2.0),
+                     (float)focalLength);
 
-			vec3 focalPoint = cameraPos + (focalDistance/(eyeDist/(eyeDist+focalLength))) * (dir-cameraPos);
+			float eyeToPixel = glm::distance(cameraPos, dir);
+
+			vec3 focalPoint = cameraPos + (eyeToPixel/(eyeDist/(eyeDist+focalDistance))) * (dir-cameraPos);
 
 			int randomX[rays], randomY[rays], _x, _y;
 			//std::default_random_engine generator;
-  		//std::uniform_int_distribution<int> distribution(0,apertureSize);
+  			//std::uniform_int_distribution<int> distribution(0,apertureSize);
 
 			for (int n=0; n<rays; n++)
 			{
@@ -229,17 +231,20 @@ void Draw()
 				randomX[n] = _x;
 				randomY[n] = _y;
 
-				newCameraPos[n] = vec3((float)randomX[n], (float)randomY[n], -1.9);
+				//new camera position: in random, with aperture size
+				newCameraPos[n] = vec3((dir.x - apertureSize/2) + (float)randomX[n], 
+									   (dir.y - apertureSize/2) + (float)randomY[n], 
+										-1.9);
 			}
 
-			dir = glm::normalize(focalPoint);
+			vec3 newDir = glm::normalize(focalPoint);
 
 			vec3 color;
 
 			for (int n=0; n<rays; n++)
 			{
 				bool check;
-				check = ClosestIntersection(newCameraPos[n], dir, triangles, closestInt);
+				check = ClosestIntersection(newCameraPos[n], newDir, triangles, closestInt);
 
 				if (check)
 				{
