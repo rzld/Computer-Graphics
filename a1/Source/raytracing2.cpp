@@ -11,6 +11,7 @@
 #include "limits.h"
 #include "math.h"
 //#include <random>
+#include <fstream>
 
 #define PI 3.14159
 
@@ -50,14 +51,14 @@ vec3 lightPos(0.0, -0.5, -0.5);
 vec3 lightColor = 14.f * vec3(1.0, 1.0, 1.0);
 vec3 indirectLight = 0.5f * vec3(1, 1, 1);
 
-vec3 forward(0.0, 0.0, 0.1); //for backward, subtract this vector
+vec3 forwards(0.0, 0.0, 0.1); //for backward, subtract this vector
 vec3 _right(0.1, 0.0, 0.0); //for left, subtract this vector
 vec3 up(0.0, -0.1, 0.0); //for down, subtract this vector
 
 //DOF
-int apertureSize = 64;
-int rays = 16;
-float focalDistance = 100;
+int apertureSize = 32;
+const int rays = 8;
+float focalDistance = 300;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -106,14 +107,14 @@ void Update()
 	{
 		cout << "Forward" << endl;
 		//move camera forward
-		cameraPos += forward;
+		cameraPos += forwards;
 		cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << endl;
 	}
 	if (keystate[SDLK_DOWN])
 	{
 		cout << "Backward" << endl;
 		//move camera backward
-		cameraPos -= forward;
+		cameraPos -= forwards;
 		cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << endl;
 	}
 	if (keystate[SDLK_LEFT])
@@ -160,13 +161,13 @@ void Update()
 	if (keystate[SDLK_w])
 	{
 		cout << "Light forward" << endl;
-		lightPos += forward;
+		lightPos += forwards;
 		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 	}
 	if (keystate[SDLK_s])
 	{
 		cout << "Light backward" << endl;
-		lightPos -= forward;
+		lightPos -= forwards;
 		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 	}
 	if (keystate[SDLK_a])
@@ -202,17 +203,18 @@ void Draw()
 		SDL_LockSurface(screen);
 
 	//cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << " " << endl;
-	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, float(focalLength));
+	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, float(focalLength)));
 	for( int j=0; j<SCREEN_HEIGHT; ++j )
 	{
 		for( int i=0; i<SCREEN_WIDTH; ++i )
 		{
-			vector<vec3> newCameraPos(rays);
-			vec3 totalColor;
+			vector<vec3> newCameraPos(rays), newCameraPosN(rays);
 
 			vec3 dir((float)i - (float)(SCREEN_WIDTH/2.0),
 			         (float)j - (float)(SCREEN_HEIGHT/2.0),
                      (float)focalLength);
+
+			vec3 dir2 = glm::normalize(dir);
 
 			float eyeToPixel = glm::distance(cameraPos, dir);
 
@@ -222,10 +224,13 @@ void Draw()
 			//std::default_random_engine generator;
   			//std::uniform_int_distribution<int> distribution(0,apertureSize);
 
+			//ofstream myfile;
+			//myfile.open("test5.txt");
 			for (int n=0; n<rays; n++)
 			{
 				//_x = distribution(generator);
 				//_y = distribution(generator);
+
 				_x = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
 				_y = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
 				randomX[n] = _x;
@@ -234,24 +239,33 @@ void Draw()
 				//new camera position: in random, with aperture size
 				newCameraPos[n] = vec3((dir.x - apertureSize/2) + (float)randomX[n], 
 									   (dir.y - apertureSize/2) + (float)randomY[n], 
-										-1.9);
+										(float)focalLength);
+				newCameraPosN[n] = glm::normalize(newCameraPos[n]);
+
+				/*newCameraPos[n] = vec3((dir.x - apertureSize / 2) + n,
+									   (dir.y - apertureSize / 2) + n,
+									   (float)focalLength);
+
+				newCameraPosN[n] = glm::normalize(newCameraPos[n]);*/
+				//myfile << newCameraPos[n].x << " " << newCameraPos[n].y << " " << newCameraPos[n].z << endl;
 			}
-
+			//myfile.close();
 			vec3 newDir = glm::normalize(focalPoint);
-
-			vec3 color;
+			
+			vec3 totalColor;
 
 			for (int n=0; n<rays; n++)
 			{
 				bool check;
-				check = ClosestIntersection(newCameraPos[n], newDir, triangles, closestInt);
+				check = ClosestIntersection(cameraPos, newCameraPosN[n], triangles, closestInt);
+				vec3 color;
 
 				if (check)
 				{
 					//cout << "Check" << endl;
 					intersectionIndex = closestInt.triangleIndex;
 					//triangle color
-					vec3 colorOri(triangles[intersectionIndex].color);
+					vec3 colorOri = vec3(triangles[intersectionIndex].color);
 					//PutPixelSDL( screen, i, j, color );
 
 					//light only
@@ -276,6 +290,8 @@ void Draw()
 				totalColor += color;
 			}
 			//cout << totalColor.x << " " << totalColor.y << " " << totalColor.z << endl;
+			totalColor /= (float)rays;
+
 			PutPixelSDL(screen, i, j, totalColor);
 		}
 	}
@@ -348,7 +364,7 @@ vec3 DirectLight(const Intersection& i)
 	_n = triangles[i.triangleIndex].normal;
 
 	radius = glm::distance(lightPos, intersectionPos);
-	area = 4 * PI * radius * radius;
+	area = (float)(4.0 * PI * radius * radius);
 
 	_r = lightPos - intersectionPos;
 	_r = glm::normalize(_r);
