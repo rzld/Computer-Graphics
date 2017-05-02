@@ -1,6 +1,5 @@
-//12.04.17 - direct shadow works!
-
 //this file is for raytracer with extension
+// extension: anti-aliasing (smooth edges)
 
 #include <iostream>
 #include <glm/glm.hpp>
@@ -56,7 +55,7 @@ vec3 _right(0.1, 0.0, 0.0); //for left, subtract this vector
 vec3 up(0.0, -0.1, 0.0); //for down, subtract this vector
 
 //DOF
-int apertureSize = 32;
+int apertureSize = 4;
 const int rays = 8;
 float focalDistance = 300;
 
@@ -202,6 +201,11 @@ void Draw()
 	if( SDL_MUSTLOCK(screen) )
 		SDL_LockSurface(screen);
 
+	float jitterMat[8] = { -1.0 / 4.0,  3.0 / 4.0,
+						   3.0 / 4.0,  1.0 / 4.0,
+						  -3.0 / 4.0, -1.0 / 4.0,
+						   1.0 / 4.0, -3.0 / 4.0 };
+
 	//cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << " " << endl;
 	float eyeDist = glm::distance(cameraPos, vec3(0.0, 0.0, float(focalLength)));
 	for( int j=0; j<SCREEN_HEIGHT; ++j )
@@ -220,41 +224,49 @@ void Draw()
 
 			vec3 focalPoint = cameraPos + (eyeToPixel/(eyeDist/(eyeDist+focalDistance))) * (dir-cameraPos);
 
-			int randomX[rays], randomY[rays], _x, _y;
+			float randomX[rays], randomY[rays], _x, _y;
 			//std::default_random_engine generator;
   			//std::uniform_int_distribution<int> distribution(0,apertureSize);
 
-			//ofstream myfile;
-			//myfile.open("test5.txt");
-			for (int n=0; n<rays; n++)
+			//for (int n=0; n<rays; n++)
+			//{
+			//	//_x = distribution(generator);
+			//	//_y = distribution(generator);
+
+			//	_x = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
+			//	_y = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
+			//	randomX[n] = _x;
+			//	randomY[n] = _y;
+
+			//	//new camera position: in random, with aperture size
+			//	newCameraPos[n] = vec3(dir.x + (float)randomX[n], 
+			//						   dir.y + (float)randomY[n], 
+			//							(float)focalLength);
+			//	newCameraPosN[n] = glm::normalize(newCameraPos[n]);
+
+			//	/*newCameraPos[n] = vec3((dir.x - apertureSize / 2) + n,
+			//						   (dir.y - apertureSize / 2) + n,
+			//						   (float)focalLength);
+
+			//	newCameraPosN[n] = glm::normalize(newCameraPos[n]);*/
+			//	//myfile << newCameraPos[n].x << " " << newCameraPos[n].y << " " << newCameraPos[n].z << endl;
+			//}
+
+			for (int n = 0; n < 4; ++n)
 			{
-				//_x = distribution(generator);
-				//_y = distribution(generator);
-
-				_x = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
-				_y = 0 + (rand()/(RAND_MAX/(apertureSize-0)));
-				randomX[n] = _x;
-				randomY[n] = _y;
-
-				//new camera position: in random, with aperture size
-				newCameraPos[n] = vec3((dir.x - apertureSize/2) + (float)randomX[n], 
-									   (dir.y - apertureSize/2) + (float)randomY[n], 
-										(float)focalLength);
+				newCameraPos[n] = vec3(dir.x + jitterMat[2 * n],
+					dir.y + jitterMat[2 * n + 1],
+					dir.z);
+				
 				newCameraPosN[n] = glm::normalize(newCameraPos[n]);
-
-				/*newCameraPos[n] = vec3((dir.x - apertureSize / 2) + n,
-									   (dir.y - apertureSize / 2) + n,
-									   (float)focalLength);
-
-				newCameraPosN[n] = glm::normalize(newCameraPos[n]);*/
-				//myfile << newCameraPos[n].x << " " << newCameraPos[n].y << " " << newCameraPos[n].z << endl;
 			}
-			//myfile.close();
+
 			vec3 newDir = glm::normalize(focalPoint);
 			
 			vec3 totalColor;
+			int nx = 0;
 
-			for (int n=0; n<rays; n++)
+			for (int n=0; n<4; n++)
 			{
 				bool check;
 				check = ClosestIntersection(cameraPos, newCameraPosN[n], triangles, closestInt);
@@ -287,10 +299,14 @@ void Draw()
 					//PutPixelSDL( screen, i, j, color );
 				}
 
-				totalColor += color;
+				if (color.x > 0.0 && color.y > 0.0 && color.z > 0.0)
+				{
+					totalColor += color;
+					nx++;
+				}
 			}
 			//cout << totalColor.x << " " << totalColor.y << " " << totalColor.z << endl;
-			totalColor /= (float)rays;
+			totalColor /= (float)nx;
 
 			PutPixelSDL(screen, i, j, totalColor);
 		}
