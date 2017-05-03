@@ -593,12 +593,12 @@ void PixelShader(const Pixel& p)
 	vec3 _n, _r, d, illumination;
 
 	_n = v.normal;
-	radius = glm::distance(lightPos, surfacePoint);
+	radius = glm::distance(lightPos, p.pos3d);
 	area = 4 * PI * radius * radius;
 
 	//cout << radius << " " << area << endl;
 
-	_r = glm::normalize(lightPos - surfacePoint);
+	_r = glm::normalize(lightPos - p.pos3d);
 
 	float pMax = glm::max((float)glm::dot(_r, _n), (float)0.0);
 
