@@ -1,8 +1,5 @@
 //RASTERISATION
 
-//Progress 11/04/2017:
-// lighting still not work!
-
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/fwd.hpp>
