@@ -21,26 +21,6 @@ using glm::vec2;
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
-const int SCREEN_WIDTH = 500;
-const int SCREEN_HEIGHT = 500;
-SDL_Surface* screen;
-int t;
-
-vector<Triangle> triangles;
-vec3 cameraPos(0, 0, -2.0);
-float focalLength = 250.0;
-mat3 R;
-float yaw = 0;
-float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
-vec3 currentColor;
-vec3 lightPos(0, -0.5, -0.7);
-vec3 lightPower = 1.1f*vec3(1,1,1);
-vec3 indirectLight = 0.5f*vec3(1,1,1);
-vec3 surfacePoint;
-
-vec3 currentNormal;
-vec3 currentReflectance;
-
 struct Pixel
 {
 	int x;
@@ -55,6 +35,31 @@ struct Vertex
 	//vec3 normal;
 	//vec3 reflectance;
 };
+
+const int SCREEN_WIDTH = 500;
+const int SCREEN_HEIGHT = 500;
+SDL_Surface* screen;
+int t;
+
+vector<Triangle> triangles;
+vec3 cameraPos(0, 0, -3.001);
+float focalLength = 250.0;
+mat3 R;
+float yaw = 0;
+float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+vec3 currentColor;
+//vec3 lightPos1(0.0, -0.5, -0.7);
+vec3 lightPos(0.0, -0.4, -0.5);
+vec3 lightPower = 3.0f*vec3(1,1,1);
+vec3 indirectLight = 0.7f*vec3(1,1,1);
+vec3 surfacePoint;
+
+vec3 currentNormal;
+vec3 currentReflectance;
+
+vec3 forward(0.0, 0.0, 0.1); //for backward, subtract this vector
+vec3 _right(0.1, 0.0, 0.0); //for left, subtract this vector
+vec3 up(0.0, -0.1, 0.0); //for down, subtract this vector
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -88,6 +93,8 @@ int main( int argc, char* argv[] )
 
 	LoadTestModel(triangles);
 	cout << "Load test model" << endl;
+
+	//lightPos = vec3(lightPos1);
 
 	// ComputePolygonRows test
 	/*
@@ -125,7 +132,46 @@ void Update()
 	int t2 = SDL_GetTicks();
 	float dt = float(t2-t);
 	t = t2;
-	cout << "Render time: " << dt << " ms." << endl;
+	//cout << "Render time: " << dt << " ms." << endl;
+
+	Uint8* keystate = SDL_GetKeyState(0);
+	//LIGHT CONTROL
+	if (keystate[SDLK_w])
+	{
+		cout << "Light forward" << endl;
+		lightPos += forward;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
+	if (keystate[SDLK_s])
+	{
+		cout << "Light backward" << endl;
+		lightPos -= forward;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
+	if (keystate[SDLK_a])
+	{
+		cout << "Light left" << endl;
+		lightPos -= _right;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
+	if (keystate[SDLK_d])
+	{
+		cout << "Light right" << endl;
+		lightPos += _right;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
+	if (keystate[SDLK_q])
+	{
+		cout << "Light up" << endl;
+		lightPos += up;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
+	if (keystate[SDLK_e])
+	{
+		cout << "Light down" << endl;
+		lightPos -= up;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}
 }
 
 void Draw()
@@ -138,6 +184,9 @@ void Draw()
 	for (int y=0; y<SCREEN_HEIGHT; ++y)
 		for (int x=0; x<SCREEN_WIDTH; ++x)
 			depthBuffer[y][x] = 0;
+
+	//cout << "Draw" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 
 	for (int i=0; i<(int)triangles.size(); ++i)
 	{
@@ -372,7 +421,7 @@ void VertexShaderP(const Vertex& v, Pixel& p)
 	p.zinv = 1/pos.z;
 	p.x = (focalLength * (pos.x / pos.z)) + (SCREEN_WIDTH / 2);
 	p.y = (focalLength * (pos.y / pos.z)) + (SCREEN_HEIGHT / 2);
-	p.pos3d = vec3(pos); //or vec3(v.position)?
+	p.pos3d = vec3(v.position); //or vec3(v.position)?
 
 	//cout << p.x << " " << p.y << " " << p.zinv << endl;
 	//depthBuffer[p.y][p.x] = p.zinv;
@@ -409,11 +458,15 @@ void VertexShaderP(const Vertex& v, Pixel& p)
 
 	//cout << p.illumination.x << " " << p.illumination.y << " " << p.illumination.z << endl;
 	*/
+	//cout << "VertexShader" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 }
 
 //void DrawPolygonP(const vector<vec3>& vertices)
 void DrawPolygonP(const vector<Vertex>& vertices)
 {
+	//cout << "DrawPolygonStart" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 	int V = vertices.size();
 
 	vector<Pixel> vertexPixels(V);
@@ -425,7 +478,11 @@ void DrawPolygonP(const vector<Vertex>& vertices)
 	vector<Pixel> leftPixels;
 	vector<Pixel> rightPixels;
 	ComputePolygonRowsP(vertexPixels, leftPixels, rightPixels);
+	//cout << "ComputePolygonRows" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 	DrawPolygonRowsP(leftPixels, rightPixels);
+	//cout << "DrawPolygonRows" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 }
 
 void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
@@ -436,7 +493,10 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 	float stepY = (b.y - a.y) / float(glm::max(N-1, 1));
 	float stepZ = (b.zinv - a.zinv) / float(glm::max(N-1, 1));
 	//vec3 stepI = (b.illumination - a.illumination) / float(glm::max(N-1, 1));
-	vec3 stepP = (b.pos3d - a.pos3d) / float(glm::max(N - 1, 1));
+	//vec3 stepP = (b.pos3d - a.pos3d) / float(glm::max(N - 1, 1));
+	float stepPX = (b.pos3d.x - a.pos3d.x) / float(glm::max(N - 1, 1));
+	float stepPY = (b.pos3d.y - a.pos3d.y) / float(glm::max(N - 1, 1));
+	float stepPZ = (b.pos3d.z - a.pos3d.z) / float(glm::max(N - 1, 1));
 
 	//cout << a.illumination.x << " " << a.illumination.y << " " << a.illumination.z << endl;
 	//cout << b.illumination.x << " " << b.illumination.y << " " << b.illumination.z << endl << endl;
@@ -444,23 +504,34 @@ void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result)
 
 	float currentX = (float)a.x;
 	float currentY = (float)a.y;
-	float currentZ = a.zinv;
+	float currentZ = (float)a.zinv;
 	//vec3 currentI = a.illumination;
-	vec3 currentP = a.pos3d;
+	//vec3 currentP = a.pos3d;
+	float currentPX = (float)a.pos3d.x;
+	float currentPY = (float)a.pos3d.y;
+	float currentPZ = (float)a.pos3d.z;
 
 	for (int i=0; i<N; i++)
 	{
-		result[i].x = (int)currentX;
-		result[i].y = (int)currentY;
-		result[i].zinv = currentZ;
+		//cout << currentP.x << " " << currentP.y << " " << currentP.z << endl;
+
+		result[i].x = (float)currentX;
+		result[i].y = (float)currentY;
+		result[i].zinv = (float)currentZ;
 		//result[i].illumination = currentI;
-		result[i].pos3d = currentP;
+		//result[i].pos3d = currentP;
+		result[i].pos3d.x = (float)currentPX;
+		result[i].pos3d.y = (float)currentPY;
+		result[i].pos3d.z = (float)currentPZ;
 
 		currentX += stepX;
 		currentY += stepY;
 		currentZ += stepZ;
 		//currentI += stepI;
-		currentP += stepP;
+		//currentP += stepP;
+		currentPX += stepPX;
+		currentPY += stepPY;
+		currentPZ += stepPZ;
 	}
 }
 
@@ -531,24 +602,28 @@ void ComputePolygonRowsP(const vector<Pixel>& vertexPixels,
 					{
 						leftPixels[b].x = leftX;
 						leftPixels[b].zinv = line[a].zinv;
-						leftPixels[b].illumination = vec3(line[a].illumination);
+						leftPixels[b].pos3d = vec3(line[a].pos3d);
 						//depthBuffer[leftPixels[b].y][leftPixels[b].x] = leftPixels[b].zinv;
 					}
 					if (line[a].x > rightPixels[b].x)
 					{
 						rightPixels[b].x = rightX;
 						rightPixels[b].zinv = line[a].zinv;
-						rightPixels[b].illumination = vec3(line[a].illumination);
+						rightPixels[b].pos3d = vec3(line[a].pos3d);
 						//depthBuffer[rightPixels[b].y][rightPixels[b].x] = rightPixels[b].zinv;
 					}
 				}
 			}
 		}
 	}
+	//cout << "ComputePolygonRows" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 }
 
 void DrawPolygonRowsP(const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels)
 {
+	//cout << "DrawPolygonRows1" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 	for (int i=0; i<(int)leftPixels.size(); i++)
 	{
 		vector<Pixel> rowPixels((rightPixels[i].x - leftPixels[i].x)+1);
@@ -560,6 +635,8 @@ void DrawPolygonRowsP(const vector<Pixel>& leftPixels, const vector<Pixel>& righ
 			//cout << rowPixels[j].illumination.x << " " << rowPixels[j].illumination.y << " " << rowPixels[j].illumination.z << endl;
 		}
 	}
+	//cout << "DrawPolygonRows2" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 }
 
 //void DrawPolygonEdgesP(const vector<vec3>& vertices)
@@ -583,6 +660,8 @@ void DrawPolygonEdgesP(const vector<Vertex>& vertices)
 		vec3 color(1, 1, 1);
 		DrawLineSDL(screen, startV, endV, currentColor);
 	}
+	//cout << "DrawPolygonEdges" << endl;
+	//cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
 }
 
 void PixelShader(const Pixel& p)
@@ -592,9 +671,9 @@ void PixelShader(const Pixel& p)
 	float area;
 	vec3 _n, _r, d, illumination;
 
-	_n = v.normal;
+	_n = currentNormal;
 	radius = glm::distance(lightPos, p.pos3d);
-	area = 4 * PI * radius * radius;
+	area = (float)4.0 * PI * radius * radius;
 
 	//cout << radius << " " << area << endl;
 
@@ -616,12 +695,18 @@ void PixelShader(const Pixel& p)
 	//d = lightPower/area;
 	illumination = currentReflectance * (d + indirectLight);
 
-	//cout << p.illumination.x << " " << p.illumination.y << " " << p.illumination.z << endl;
-	
+	//cout << illumination.x << " " << illumination.y << " " << illumination.z << endl;
 
 	if(p.zinv > depthBuffer[p.y][p.x])
 	{
 		depthBuffer[p.y][p.x] = p.zinv;
 		PutPixelSDL(screen, p.x, p.y, illumination);
 	}
+
+	//lightPos = vec3(lightPos);
+	/*if (lightPos.x < 1.0)
+	{
+		cout << "PShader2" << endl;
+		cout << lightPos.x << " " << lightPos.y << " " << lightPos.z << endl;
+	}*/
 }
